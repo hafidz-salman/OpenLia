@@ -13,10 +13,32 @@ use App\Imports\SchedulesImport;
 
 class ScheduleController extends Controller
 {
-    public function index()
+    
+    public function index(Request $request)
     {
-        $schedules = Schedule::with(['user', 'room', 'prodi'])->latest()->get();
-        return view('admin.schedules.index', compact('schedules'));
+        // Ambil semua data master untuk filter
+        $prodis = \App\Models\Prodi::orderBy('nama_prodi')->get();
+        $dosens = \App\Models\User::where('role', 'dosen')->orderBy('name')->get();
+        $angkatans = \App\Models\Schedule::select('angkatan')->distinct()->orderBy('angkatan', 'desc')->get();
+
+        // Query dasar untuk jadwal
+        $query = \App\Models\Schedule::with(['user', 'room', 'prodi']);
+
+        // Terapkan filter jika ada
+        if ($request->filled('prodi_id')) {
+            $query->where('prodi_id', $request->prodi_id);
+        }
+        if ($request->filled('angkatan')) {
+            $query->where('angkatan', $request->angkatan);
+        }
+        if ($request->filled('dosen_id')) {
+            $query->where('user_id', $request->dosen_id);
+        }
+
+        // Urutkan berdasarkan hari dan jam mulai
+        $schedules = $query->orderBy('hari')->orderBy('jam_mulai')->get();
+
+        return view('admin.schedules.index', compact('schedules', 'prodis', 'dosens', 'angkatans'));
     }
 
     public function create()

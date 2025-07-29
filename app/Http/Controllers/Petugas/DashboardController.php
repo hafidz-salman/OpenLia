@@ -17,31 +17,27 @@ class DashboardController extends Controller
         $petugasId = Auth::id();
         $now = Carbon::now();
 
-        // 1. Ambil ID semua ruangan yang sudah dibersihkan HARI INI
-        $cleanedTodayIds = CleaningLog::whereDate('start_time', $now->toDateString()) // <-- PERBAIKAN
-                                      ->pluck('room_id')
-                                      ->unique();
-
-        // 2. Ambil ID semua ruangan yang sedang digunakan sesuai jadwal SAAT INI
+        $cleanedTodayIds = CleaningLog::whereDate('start_time', $now->toDateString())->pluck('room_id')->unique();
         $inUseRoomIds = Schedule::where('hari', $now->translatedFormat('l'))
                                 ->where('jam_mulai', '<=', $now->format('H:i:s'))
                                 ->where('jam_selesai', '>=', $now->format('H:i:s'))
                                 ->pluck('room_id')->unique();
-
-        // 3. Ambil daftar ruangan yang belum dibersihkan
         $uncleanedRooms = Room::whereNotIn('id', $cleanedTodayIds)->orderBy('nama_ruangan')->get();
-
-        // 4. Cek sesi pembersihan yang sedang aktif oleh petugas ini
         $activeLog = CleaningLog::where('user_id', $petugasId)->whereNull('end_time')->first();
+        $allRooms = Room::orderBy('nama_ruangan')->get();
+        $totalLogs = CleaningLog::where('user_id', $petugasId)->count();
 
         return view('petugas.dashboard', compact(
             'uncleanedRooms', 
             'cleanedTodayIds', 
             'inUseRoomIds', 
-            'activeLog'
+            'activeLog',
+            'allRooms',
+            'totalLogs'
         ));
     }
 
+    // ... (method startCleaning, endCleaning, startCleaningAll tetap sama) ...
     public function startCleaning(Room $room)
     {
         $isActive = CleaningLog::where('user_id', Auth::id())->whereNull('end_time')->exists();
@@ -64,41 +60,52 @@ class DashboardController extends Controller
     {
         $petugasId = Auth::id();
         $now = Carbon::now();
-
         if (CleaningLog::where('user_id', $petugasId)->whereNull('end_time')->exists()) {
             return back()->with('error', 'Selesaikan sesi pembersihan Anda saat ini terlebih dahulu.');
         }
-
-        $cleanedTodayIds = CleaningLog::whereDate('start_time', $now->toDateString())->pluck('room_id')->unique(); // <-- PERBAIKAN
-        
+        $cleanedTodayIds = CleaningLog::whereDate('start_time', $now->toDateString())->pluck('room_id')->unique();
         $inUseRoomIds = Schedule::where('hari', $now->translatedFormat('l'))
                                 ->where('jam_mulai', '<=', $now->format('H:i:s'))
                                 ->where('jam_selesai', '>=', $now->format('H:i:s'))
                                 ->pluck('room_id')->unique();
-        
-        $roomsToClean = Room::whereNotIn('id', $cleanedTodayIds)
-                            ->whereNotIn('id', $inUseRoomIds)
-                            ->get();
-
+        $roomsToClean = Room::whereNotIn('id', $cleanedTodayIds)->whereNotIn('id', $inUseRoomIds)->get();
         if ($roomsToClean->isEmpty()) {
             return back()->with('info', 'Tidak ada ruangan yang bisa dibersihkan saat ini.');
         }
-
         foreach ($roomsToClean as $room) {
-            CleaningLog::create([
-                'user_id' => $petugasId,
-                'room_id' => $room->id,
-                'start_time' => $now,
-                'end_time' => $now,
-            ]);
+            CleaningLog::create(['user_id' => $petugasId, 'room_id' => $room->id, 'start_time' => now(), 'end_time' => now()]);
         }
-
         return redirect()->route('petugas.dashboard')->with('success', $roomsToClean->count() . ' ruangan telah ditandai sebagai selesai dibersihkan.');
     }
 
+    /**
+     * Method untuk menampilkan riwayat pembersihan.
+     */
     public function history()
     {
-        $logs = CleaningLog::where('user_id', Auth::id())->with('room')->latest()->paginate(20);
-        return view('petugas.history', compact('logs'));
+        $petugasId = Auth::id();
+        $allUserLogs = CleaningLog::where('user_id', $petugasId);
+
+        // Ambil data riwayat dengan paginasi
+        $logs = $allUserLogs->with('room')->latest()->paginate(10);
+
+        // --- PERBAIKAN DI SINI ---
+        // Hitung semua statistik yang dibutuhkan oleh view
+        $totalLogs = $allUserLogs->count();
+        $ongoingLogs = $allUserLogs->whereNull('end_time')->count();
+        $completedLogs = $totalLogs - $ongoingLogs;
+
+        // Hitung rata-rata durasi (hanya untuk log yang sudah selesai)
+        $totalDurationSeconds = CleaningLog::where('user_id', $petugasId)
+                                    ->whereNotNull('end_time')
+                                    ->get()
+                                    ->sum(function ($log) {
+                                        return Carbon::parse($log->start_time)->diffInSeconds($log->end_time);
+                                    });
+        
+        $avgDuration = $completedLogs > 0 ? round($totalDurationSeconds / $completedLogs / 60) . ' menit' : 'N/A';
+
+
+        return view('petugas.history', compact('logs', 'totalLogs', 'ongoingLogs', 'completedLogs', 'avgDuration'));
     }
 }

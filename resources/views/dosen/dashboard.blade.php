@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Mahasiswa</title>
+    <title>Dashboard Dosen</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="//unpkg.com/alpinejs" defer></script>
 </head>
@@ -13,7 +13,7 @@
         <!-- Header -->
         <div class="flex justify-between items-center mb-8">
             <div>
-                <h1 class="text-3xl font-bold text-gray-800">Dashboard Mahasiswa</h1>
+                <h1 class="text-3xl font-bold text-gray-800">Dashboard Dosen</h1>
                 <p class="text-gray-500">Selamat datang, {{ Auth::user()->name }}!</p>
             </div>
             
@@ -41,16 +41,23 @@
         </div>
 
         <!-- Bento Grid Layout -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            <!-- Widget Jadwal Kuliah (Besar) -->
-            <a href="{{ route('mahasiswa.jadwal.index') }}" class="md:col-span-2 bg-indigo-500 text-white p-6 rounded-lg shadow-lg hover:bg-indigo-600 transition flex flex-col justify-between">
+            <!-- Widget Jadwal Saya (Besar) -->
+            <a href="{{ route('dosen.jadwal.index') }}" class="md:col-span-2 bg-blue-500 text-white p-6 rounded-lg shadow-lg hover:bg-blue-600 transition flex flex-col justify-between">
                 <div>
-                    <h3 class="text-xl font-bold">Jadwal Kuliah Saya</h3>
-                    <p class="mt-2 opacity-80">Lihat jadwal mata kuliah Anda yang relevan berdasarkan prodi dan angkatan.</p>
+                    <h3 class="text-xl font-bold">Jadwal Mengajar Saya</h3>
+                    <p class="mt-2 opacity-80">Lihat semua jadwal mengajar Anda yang telah diatur oleh Admin.</p>
                 </div>
-                <div class="text-right mt-4 text-4xl font-black opacity-20">🎓</div>
+                <div class="text-right mt-4 text-4xl font-black opacity-20">🗓️</div>
             </a>
+
+            <!-- WIDGET YANG HILANG -->
+            <a href="{{ route('dosen.users.index') }}" class="bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition">
+                <h3 class="font-semibold text-gray-800">Lihat Pengguna Prodi</h3>
+                <p class="text-sm text-gray-500 mt-1">Lihat daftar mahasiswa dan dosen di prodi Anda.</p>
+            </a>
+            <!-- --------------------- -->
 
             <!-- Widget Scan Ruangan -->
             <a href="{{ route('scanner.show') }}" class="bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition">
@@ -61,13 +68,13 @@
             <!-- Widget Booking Ruangan -->
             <a href="{{ route('booking.create') }}" class="bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition">
                 <h3 class="font-semibold text-gray-800">Booking Ruangan</h3>
-                <p class="text-sm text-gray-500 mt-1">Ajukan peminjaman untuk acara atau kegiatan khusus.</p>
+                <p class="text-sm text-gray-500 mt-1">Ajukan peminjaman untuk acara atau kelas pengganti.</p>
             </a>
             
             <!-- Widget Riwayat Permintaan -->
-            <a href="{{ route('mahasiswa.history.index') }}" class="md:col-span-2 bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition">
-                <h3 class="font-semibold text-gray-800">Riwayat Permintaan Saya</h3>
-                <p class="text-sm text-gray-500 mt-1">Lacak status semua permintaan peminjaman ruangan yang Anda ajukan.</p>
+            <a href="{{ route('dosen.history.index') }}" class="bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition">
+                <h3 class="font-semibold text-gray-800">Riwayat Permintaan</h3>
+                <p class="text-sm text-gray-500 mt-1">Lacak status semua permintaan yang Anda ajukan.</p>
             </a>
 
         </div>

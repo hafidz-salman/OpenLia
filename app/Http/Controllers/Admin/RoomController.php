@@ -16,12 +16,32 @@ use Illuminate\Support\Facades\Auth;
 class RoomController extends Controller
 {
     /**
-     * Menampilkan daftar semua ruangan.
+     * Menampilkan daftar semua ruangan dengan fungsionalitas filter.
      */
-    public function index()
+    public function index(Request $request) // --- PERBAIKAN DI SINI --- (Nama method menjadi index)
     {
-        $rooms = Room::latest()->get();
-        return view('admin.rooms.index', compact('rooms'));
+        // Ambil data unik untuk filter dropdown
+        $gedungs = Room::select('gedung')->distinct()->orderBy('gedung')->get();
+        $statuses = Room::select('status')->distinct()->orderBy('status')->get();
+
+        // Query dasar
+        $query = Room::query();
+
+        // Terapkan filter jika ada input dari pengguna
+        if ($request->filled('search')) {
+            $query->where('nama_ruangan', 'like', '%' . $request->search . '%');
+        }
+        if ($request->filled('gedung')) {
+            $query->where('gedung', $request->gedung);
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $rooms = $query->latest()->get();
+
+        // Kirim semua data yang dibutuhkan ke view
+        return view('admin.rooms.index', compact('rooms', 'gedungs', 'statuses'));
     }
 
     /**
@@ -29,7 +49,6 @@ class RoomController extends Controller
      */
     public function create()
     {
-        // Template fasilitas untuk mempermudah input
         $facilityTemplates = [
             'Kelas' => ['Proyektor', 'Papan Tulis', 'AC', 'Meja & Kursi'],
             'Lab Komputer' => ['Komputer', 'Jaringan Internet', 'Proyektor', 'AC'],
@@ -54,38 +73,16 @@ class RoomController extends Controller
         ]);
 
         $data = $request->except('foto');
-
-        // 1. Generate Kode Unik Otomatis
         $data['code'] = 'R' . strtoupper(Str::random(8));
 
-        // 2. Handle Upload Foto
         if ($request->hasFile('foto')) {
-            $path = $request->file('foto')->store('public/room_photos');
+            $path = $request->file('foto')->store('room_photos', 'public');
             $data['foto'] = $path;
         }
 
         Room::create($data);
 
         return redirect()->route('admin.rooms.index')->with('success', 'Ruangan baru berhasil ditambahkan.');
-    }
-
-        /**
-     * Menangani proses impor file Excel.
-     */
-    public function importExcel(Request $request)
-    {
-        $request->validate([
-            'excel_file' => 'required|mimes:xlsx,xls',
-        ]);
-
-        try {
-            Excel::import(new RoomsImport, $request->file('excel_file'));
-        } catch (\Exception $e) {
-            // Jika ada error saat impor, kembali dengan pesan error
-            return back()->with('error', 'Terjadi kesalahan saat mengimpor file: ' . $e->getMessage());
-        }
-
-        return redirect()->route('admin.rooms.index')->with('success', 'Data ruangan berhasil diimpor dari Excel.');
     }
 
     /**
@@ -129,18 +126,15 @@ class RoomController extends Controller
 
         $data = $request->except(['foto', 'hapus_foto']);
 
-        // Skenario 1: Checkbox "Hapus foto" dicentang
         if ($request->boolean('hapus_foto') && $room->foto) {
-            Storage::delete($room->foto);
+            Storage::disk('public')->delete($room->foto);
             $data['foto'] = null;
         }
-        // Skenario 2: Ada file foto baru yang di-upload
         else if ($request->hasFile('foto')) {
-            // Hapus foto lama jika ada
             if ($room->foto) {
-                Storage::delete($room->foto);
+                Storage::disk('public')->delete($room->foto);
             }
-            $path = $request->file('foto')->store('public/room_photos');
+            $path = $request->file('foto')->store('room_photos', 'public');
             $data['foto'] = $path;
         }
 
@@ -153,9 +147,8 @@ class RoomController extends Controller
      */
     public function destroy(Room $room)
     {
-        // Hapus foto dari storage sebelum menghapus record database
         if ($room->foto) {
-            Storage::delete($room->foto);
+            Storage::disk('public')->delete($room->foto);
         }
         $room->delete();
         return redirect()->route('admin.rooms.index')->with('success', 'Data ruangan berhasil dihapus.');
@@ -163,13 +156,23 @@ class RoomController extends Controller
 
     public function overrideAccess(Room $room)
     {
-        // Catat aksi ke dalam log
         AccessLog::create([
             'user_id' => Auth::id(),
             'room_id' => $room->id,
             'action'  => 'OVERRIDE_OPEN',
         ]);
-
         return back()->with('success', 'Aksi override untuk ruangan ' . $room->nama_ruangan . ' berhasil dicatat.');
+    }
+    
+    public function showImportForm()
+    {
+        return view('admin.rooms.import');
+    }
+
+    public function importExcel(Request $request)
+    {
+        $request->validate(['excel_file' => 'required|mimes:xlsx,xls']);
+        Excel::import(new RoomsImport, $request->file('excel_file'));
+        return redirect()->route('admin.rooms.index')->with('success', 'Jadwal berhasil diimpor.');
     }
 }
